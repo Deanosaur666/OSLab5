@@ -1,3 +1,11 @@
+/*
+
+This program uses the ncurses library
+Install ncurses with:
+sudo apt install libncurses-dev
+
+*/
+
 #define _GNU_SOURCE // so that it doesn't complain about scandir and alphasort
 // to ignore annoying truncation warnings
 #pragma GCC diagnostic ignored "-Wformat-truncation"
@@ -12,10 +20,16 @@
 #include <linux/limits.h>
 #include <dirent.h>
 
+#define FILE_DISPLAY_LENGTH 64
+
+#define ASCII_PRINTABLE(a) (a >= 32 && a <= 126)
+
+#define KEY_ESCAPE 27
+
 void drawFiles(struct dirent ** files, int fileCount, int fileIndex, int row, int col) {
     clear();
     for(int i = 0; i < fileCount; i ++) {
-        char item[17];
+        char item[FILE_DISPLAY_LENGTH + 1];
         struct dirent * f = files[i];
         if(i == fileIndex) {
             attron(A_STANDOUT);
@@ -28,7 +42,7 @@ void drawFiles(struct dirent ** files, int fileCount, int fileIndex, int row, in
                 attron(COLOR_PAIR(1));
         }
 
-        snprintf(item, 16, "%-16s", f->d_name);
+        snprintf(item, FILE_DISPLAY_LENGTH, "%s", f->d_name);
         mvprintw(row + i, col, "%s", item);
 
         attrset(0);
@@ -46,6 +60,7 @@ int main() {
     noecho();
     cbreak();
     keypad(stdscr, true);
+    ESCDELAY = 10;
 
     init_pair(1, COLOR_RED, COLOR_BLACK);
 
@@ -72,14 +87,29 @@ int main() {
 
     refresh();
 
-    while((c = getch()) != 'q') {
+    while(true) {
+        c = getch();
+        // escape or alt
+        if(c == KEY_ESCAPE) {
+            nodelay(stdscr, true);
+            int k = getch();
+            // ESCAPE
+            if(k == ERR) {
+                nodelay(stdscr, false);
+                break;
+            }
+            // ALT
+            else {
+                nodelay(stdscr, false);
+            }
+        }
         if(c == KEY_UP) {
             fileIndex = ((fileIndex - 1) + fileCount) % fileCount;
         }
         else if(c == KEY_DOWN) {
             fileIndex = (fileIndex + 1) % fileCount;
         }
-        else if((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+        else if(ASCII_PRINTABLE(c)) {
             echo();
             move(15, 0);
             clrtoeol();
