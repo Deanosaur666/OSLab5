@@ -1,3 +1,7 @@
+#define _GNU_SOURCE // so that it doesn't complain about scandir and alphasort
+// to ignore annoying truncation warnings
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "Dean_libFS.h"
@@ -24,7 +28,7 @@ void drawFiles(struct dirent ** files, int fileCount, int fileIndex, int row, in
                 attron(COLOR_PAIR(1));
         }
 
-        sprintf(item, "%-16s", f->d_name);
+        snprintf(item, 16, "%-16s", f->d_name);
         mvprintw(row + i, col, "%s", item);
 
         attrset(0);
