@@ -1,62 +1,56 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "Dean_libFS.h"
 #include <string.h>
 #include <ncurses.h>
+#include <menu.h>
 #include <unistd.h>
 #include <linux/limits.h>
 #include <dirent.h>
 
-#define C_BLACK 30
-#define C_RED 31
-#define C_GREEN 32
-#define C_YELLOW 33
-#define C_BLUE 34
-#define C_MAGENTA 35
-#define C_CYAN 36
-#define C_WHITE 37
-
-#define C_BG(c) (c + 10)
-#define C_BRIGHT(c) (c + 60)
-
-void cursorToHome() {
-    // Write the sequence for clearing the display:
-    // \x1B[2J - Clears the visible window
-    // \x1B[3J - Clears the scroll back
-    // \x1B[1;1H - Move cursor back to its home coordinates (top left)
-    fputs("\x1B[3J\x1B[1;1H", stdout);  
-    fflush(stdout);
-}
-
-void setColor(int c) {
-    printf("\x1B[%dm", c);
-}
-
-int getFiles(char * names[255], char * types, int count, int offset) {
-    DIR *d;
-    struct dirent *dir;
-    d = opendir(".");
-    int i = 0;
-    if(d) {
-        while((dir = readdir(d)) != NULL) {
-            if(offset > 0)
-                offset --;
-            else if(dir->d_type == DT_DIR || 
-                    dir->d_type == DT_REG) {
-                names[i] = dir->d_name;
-                types[i] = dir->d_type;
-                // type could be DT_DIR for directory
-                // or DT_REG for regular
-                i ++;
-            }
+void drawFiles(struct dirent ** files, int fileCount, int fileIndex, int row, int col) {
+    clear();
+    for(int i = 0; i < fileCount; i ++) {
+        char item[17];
+        struct dirent * f = files[i];
+        if(i == fileIndex) {
+            attron(A_STANDOUT);
+            if(f->d_type == DT_DIR)
+                attron(COLOR_PAIR(1) | A_REVERSE);
         }
-        names[i] = "";
-        types[i] = '\0';
-    }
+        else {
+            attroff(A_STANDOUT);
+            if(f->d_type == DT_DIR)
+                attron(COLOR_PAIR(1));
+        }
 
-    return i;
+        sprintf(item, "%-16s", f->d_name);
+        mvprintw(row + i, col, "%s", item);
+
+        attrset(0);
+        move(row + fileIndex, col);
+        
+    }
 }
 
 int main() {
+
+    // setup curses
+    initscr();
+    start_color();
+    clear();
+    noecho();
+    cbreak();
+    keypad(stdscr, true);
+
+    init_pair(1, COLOR_RED, COLOR_BLACK);
+
+    int c;
+
+    // my path
+    char cwd[PATH_MAX];
+    getcwd(cwd, sizeof(cwd));
+    
 
     // OPTIONS
     // create file
@@ -64,51 +58,44 @@ int main() {
     // print file contents
     // delete file
 
-    char * options[] = {
-        "CREATE",
-        "DISPLAY",
-        "EDIT",
-        "DELETE",
-    };
+    // files in my path
+    struct dirent **files;
+    int fileCount = scandir(cwd, &files, NULL, alphasort);
 
-    //char cwd[PATH_MAX];
-    //getcwd(cwd, sizeof(cwd));
+    int fileIndex = 2;
 
-    initscr();
-    clear();
-    noecho();
-    cbreak();
-    keypad(stdscr, true);
+    drawFiles(files, fileCount, fileIndex, 1, 1);
 
     refresh();
-    cursorToHome();
-    setColor(C_BG(C_BRIGHT(C_RED)));
-    printf("Hey hey hey.");
-    setColor(0);
-    printf("\nHey hey hey.\n");
 
-    while(1) {
-        int key = getch();
-        if(key == KEY_UP) {
-            printf("UP!\n");
-            cursorToHome();
+    while((c = getch()) != 'q') {
+        if(c == KEY_UP) {
+            fileIndex = ((fileIndex - 1) + fileCount) % fileCount;
         }
-        else if(key == KEY_DOWN) {
-            printf("DOWN!\n");
-            cursorToHome();
+        else if(c == KEY_DOWN) {
+            fileIndex = (fileIndex + 1) % fileCount;
         }
-        else if(key == 'q') {
-            break;
+        else if((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+            echo();
+            move(15, 0);
+            clrtoeol();
+            char buff[255];
+            scanw("%255s", (char *)&buff);
+            clrtoeol();
+            mvprintw(15, 0, "%s", buff);
+            move(0, 0);
+            noecho();
         }
-        setColor(C_BG(C_BRIGHT(C_RED)));
-        printf("Hey hey hey.");
-        setColor(0);
-        printf("\nHey hey hey.\n");
+        drawFiles(files, fileCount, fileIndex, 1, 1);
         refresh();
-        cursorToHome();
+        
     }
 
     endwin();
+
+    for(int i = 0; i < fileCount; i ++)
+        free(files[i]);
+    free(files);
 
     return 0;
 }
