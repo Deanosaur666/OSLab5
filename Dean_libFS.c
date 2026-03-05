@@ -6,7 +6,7 @@ FSOpenFile * fstree = NULL;
 int fstreeAddTo(FSOpenFile * tree, FSOpenFile * file) {
     int c = strcmp(file->name, tree->name);
     if(c == 0)
-        return ERROR; // error, can't add existing file
+        return ERROR_OPEN; // error, can't add existing file
     else if(c < 0) {
         if(tree->leftChild == NULL) {
             tree->leftChild = file;
@@ -58,7 +58,7 @@ int fstreeDelete(char * name) {
     FSOpenFile * parent;
     FSOpenFile * file = fstreeFind(fstree, name, &parent);
     if(file == NULL)
-        return ERROR;
+        return ERROR_NOT_OPEN;
     else {
         if(file == fstree)
             fstree = NULL;
@@ -82,49 +82,63 @@ int fstreeDelete(char * name) {
     }
 }
 
-// Create a new file
+// Create a new file. Errors: ERROR_BADNAME or ERROR_FAIL
 int fileCreate(char * name) {
     char bad_chars[] = "/\\!@%^*~|";
     if(strcspn(name, bad_chars) < strlen(name))
-        return ERROR;
+        return ERROR_BADNAME;
 
     FILE * f = fopen(name, "w");
     if(f == NULL)
-        return ERROR;
+        return ERROR_FAIL;
     else {
         fclose(f);
         return SUCCESS;
     }
 }
-// Open an existing file
+// Open an existing file. Errors: ERROR_OPEN or ERROR_DNE
 int fileOpen(char * name) {
     if(fstreeFind(fstree, name, NULL) != NULL)
-        return ERROR;
+        return ERROR_OPEN;
     else {
-        FSOpenFile * file = calloc(1, sizeof(FSOpenFile));
-        snprintf(file->name, MAX_FILENAME, "%s", name);
-        fstreeAdd(file);
-        return SUCCESS;
+        FILE * f = fopen(name, "r");
+        if(f == NULL) {
+            return ERROR_DNE;
+        }
+        else {
+            fclose(f);
+            FSOpenFile * file = calloc(1, sizeof(FSOpenFile));
+            snprintf(file->name, MAX_FILENAME, "%s", name);
+            fstreeAdd(file);
+            return SUCCESS;
+        }
+        
     }
 }
-// Read data from a file
+// Read data from a file. Errors: ERROR_NOT_OPEN or ERROR_DNE
 int fileRead(char * name, char * buffer, int max) {
     // is the file "open"?
     if(fstreeFind(fstree, name, NULL) == NULL) {
-        return ERROR;
+        return ERROR_NOT_OPEN;
     }
     else {
         FILE * f = fopen(name, "r");
-        fread(buffer, 1, max, f);
-        fclose(f);
-        return SUCCESS;
+        if(f == NULL) {
+            return ERROR_DNE;
+        }
+        else {
+            fread(buffer, 1, max, f);
+            fclose(f);
+            return SUCCESS;
+        }
     }
 }
 
+// Write text to file. Errors: ERROR_NOT_OPEN
 int fileWrite(char * name, char * text) {
     // is the file "open"?
     if(fstreeFind(fstree, name, NULL) == NULL) {
-        return ERROR;
+        return ERROR_NOT_OPEN;
     }
     else {
         FILE * f = fopen(name, "w");
@@ -134,22 +148,22 @@ int fileWrite(char * name, char * text) {
     }
 }
 
-// Close an open file
+// Close an open file. Errors: ERROR_NOT_OPEN
 int fileClose(char * name) {
     return fstreeDelete(name);
 }
 
-// Delete a file
+// Delete a file. Errors: ERROR_OPEN or ERROR_FAIL
 int fileDelete(char * name) {
     // is the file "open"?
     if(fstreeFind(fstree, name, NULL) != NULL) {
-        return ERROR;
+        return ERROR_OPEN;
     }
     else {
         if(remove(name) == 0)
             return SUCCESS;
         else
-            return ERROR;
+            return ERROR_FAIL;
     }
 }
 

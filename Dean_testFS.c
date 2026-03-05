@@ -177,6 +177,8 @@ int main() {
                 int status = fileCreate(input);
                 if(status == SUCCESS)
                     prompt = "File created successfully.";
+                else if(status == ERROR_BADNAME)
+                    prompt = "Invalid filename.";
                 else
                     prompt = "File could not be created.";
             }
@@ -185,6 +187,10 @@ int main() {
                 int status = fileOpen(input);
                 if(status == SUCCESS)
                     prompt = "File opened successfully.";
+                else if(status == ERROR_OPEN)
+                    prompt = "File is already open.";
+                else if(status == ERROR_DNE)
+                    prompt = "File does not exist.";
                 else
                     prompt = "File could not be opened.";
             }
@@ -195,6 +201,8 @@ int main() {
                 int status = fileWrite(input, text);
                 if(status == SUCCESS)
                     prompt = "Text written successfully.";
+                else if(status == ERROR_NOT_OPEN)
+                    prompt = "File is not open.";
                 else
                     prompt = "Text could not be written.";
             }
@@ -203,6 +211,8 @@ int main() {
                 int status = fileWrite(input, myIntro);
                 if(status == SUCCESS)
                     prompt = "Intro written successfully.";
+                else if(status == ERROR_NOT_OPEN)
+                    prompt = "File is not open.";
                 else
                     prompt = "Intro could not be written.";
             }
@@ -210,21 +220,27 @@ int main() {
                 promptInput("Enter name of file to read from:", input, promptLine, 1);
                 char text[1024]= { 0 };
                 int status = fileRead(input, text, 1024);
-                if(status == ERROR)
-                    prompt = "File could not be read.";
-                else {
+                if(status == ERROR_NOT_OPEN)
+                    prompt = "File is not open.";
+                else if(status == ERROR_DNE)
+                    prompt = "File does not exist.";
+                else if(status == SUCCESS) {
                     clear();
                     mvprintw(0, 0, "%s", text);
                     refresh();
                     getch();
                     clear();
                 }
+                else
+                    prompt = "File could not be read.";
             }
             else if(sel == CLOSE) {
                 promptInput("Enter name of file to close:", input, promptLine, 1);
                 int status = fileClose(input);
                 if(status == SUCCESS)
                     prompt = "File closed successfully.";
+                else if(status == ERROR_NOT_OPEN)
+                    prompt = "File is not open.";
                 else
                     prompt = "File could not be closed.";
             }
@@ -233,6 +249,8 @@ int main() {
                 int status = fileDelete(input);
                 if(status == SUCCESS)
                     prompt = "File deleted successfully.";
+                else if(status == ERROR_OPEN)
+                    prompt = "Cannot delete a file that is open.";
                 else
                     prompt = "File could not be deleted.";
             }
