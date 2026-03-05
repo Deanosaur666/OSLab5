@@ -26,32 +26,100 @@ sudo apt install libncurses-dev
 
 #define KEY_ESCAPE 27
 
-void drawFiles(struct dirent ** files, int fileCount, int fileIndex, int row, int col) {
-    clear();
-    for(int i = 0; i < fileCount; i ++) {
-        char item[FILE_DISPLAY_LENGTH + 1];
-        struct dirent * f = files[i];
-        if(i == fileIndex) {
+void drawOptions(char * headline, char ** options, int nOptions, int sel, int row, int col) {
+    attron(COLOR_PAIR(1));
+    mvprintw(row, col, "%s", headline);
+    attroff(COLOR_PAIR(1));
+
+    for(int i = 0; i < nOptions; i ++) {
+        if(i == sel) {
             attron(A_STANDOUT);
-            if(f->d_type == DT_DIR)
-                attron(COLOR_PAIR(1) | A_REVERSE);
         }
         else {
             attroff(A_STANDOUT);
-            if(f->d_type == DT_DIR)
-                attron(COLOR_PAIR(1));
         }
 
-        snprintf(item, FILE_DISPLAY_LENGTH, "%s", f->d_name);
-        mvprintw(row + i, col, "%s", item);
+        mvprintw(row + i + 1, col, "%s", options[i]);
 
         attrset(0);
-        move(row + fileIndex, col);
+        move(row + sel + 1, col-1);
         
     }
 }
 
+void drawPrompt(char * prompt, int row, int col) {
+    attron(A_DIM);
+    move(row, col);
+    clrtoeol();
+    mvprintw(row, col, "%s", prompt);
+    attroff(A_DIM);
+}
+
+// reads at most 255 characters
+void promptInput(char * prompt, char * buffer, int row, int col) {
+    drawPrompt(prompt, row, col);
+    echo();
+    move(row + 1, col);
+    clrtoeol();
+    scanw("%255s", buffer);
+    noecho();
+    move(row + 1, col);
+    clrtoeol();
+}
+
+void drawOpenFiles(int row, int col) {
+    attron(COLOR_PAIR(1));
+    mvprintw(row, col, "%s", "OPEN FILES");
+    attroff(COLOR_PAIR(1));
+
+    char buffer[1024] = { 0 };
+    sprintOpenFiles(buffer, 1024);
+    int i = 0;
+    int start = 0;
+    int lineLen = 0;
+    while(start < 1024 && (lineLen = strcspn(buffer + start, "\n")) < strcspn(buffer + start, "\0")) {
+        char line[1024] = { 0 };
+        strncpy(line, buffer + start, lineLen);
+        start += lineLen + 1;
+        mvprintw(row + i + 1, col, "%s", line);
+        i ++;
+    }
+}
+
+// Your introduction should include at least 3-4 sentences with 2 paragraphs.
+
+char * myIntro =
+"I'm Dean Yockey, a CWU student. This program was written for an assignment.\n"
+"This program uses the ncurses library for fancier terminal nonsense. I wanted a menu that would look nice and respond instantly to arrow keys.\n"
+"The number keys are a pain to reach. A menu based on just entering numbers feels so unwieldy and old-fashioned."
+;
+
+typedef enum OPTIONS {
+    CREATE,
+    OPEN,
+    WRITETEXT,
+    WRITEINTRO,
+    READ,
+    CLOSE,
+    DELETE,
+    EXIT,
+
+} OPTIONS;
+
 int main() {
+
+    char * options[] = {
+        "CREATE FILE",
+        "OPEN FILE",
+        "WRITE TEXT TO FILE",
+        "WRITE INTRO TO FILE",
+        "READ FROM FILE",
+        "CLOSE FILE",
+        "DELETE FILE",
+        "EXIT",
+    };
+
+    int nOptions = 8;
 
     // setup curses
     initscr();
@@ -65,30 +133,24 @@ int main() {
     init_pair(1, COLOR_RED, COLOR_BLACK);
 
     int c;
-
-    // my path
-    char cwd[PATH_MAX];
-    getcwd(cwd, sizeof(cwd));
     
 
-    // OPTIONS
-    // create file
-    // write to file
-    // print file contents
-    // delete file
+    // options and stuff
 
-    // files in my path
-    struct dirent **files;
-    int fileCount = scandir(cwd, &files, NULL, alphasort);
-
-    int fileIndex = 2;
-
-    drawFiles(files, fileCount, fileIndex, 1, 1);
+    int sel = 0;
+    int promptLine = 11;
+    int openFileCol = 32;
+    char * prompt = "Select an option with SPACE or ENTER";
+    char input[256];
+    drawOpenFiles(1, openFileCol);
+    drawPrompt(prompt, promptLine, 1);
+    drawOptions("MENU", options, nOptions, sel, 1, 1);
 
     refresh();
 
     while(true) {
         c = getch();
+
         // escape or alt
         if(c == KEY_ESCAPE) {
             nodelay(stdscr, true);
@@ -104,32 +166,89 @@ int main() {
             }
         }
         if(c == KEY_UP) {
-            fileIndex = ((fileIndex - 1) + fileCount) % fileCount;
+            sel = ((sel - 1) + nOptions) % nOptions;
         }
         else if(c == KEY_DOWN) {
-            fileIndex = (fileIndex + 1) % fileCount;
+            sel = (sel + 1) % nOptions;
         }
-        else if(ASCII_PRINTABLE(c)) {
-            echo();
-            move(15, 0);
-            clrtoeol();
-            char buff[255];
-            scanw("%255s", (char *)&buff);
-            clrtoeol();
-            mvprintw(15, 0, "%s", buff);
-            move(0, 0);
-            noecho();
+        else if(c == '\n' || c == ' ') {
+            if(sel == CREATE) {
+                promptInput("Enter name of file to create:", input, promptLine, 1);
+                int status = fileCreate(input);
+                if(status == SUCCESS)
+                    prompt = "File created successfully.";
+                else
+                    prompt = "File could not be created.";
+            }
+            else if(sel == OPEN) {
+                promptInput("Enter name of file to open:", input, promptLine, 1);
+                int status = fileOpen(input);
+                if(status == SUCCESS)
+                    prompt = "File opened successfully.";
+                else
+                    prompt = "File could not be opened.";
+            }
+            else if(sel == WRITETEXT) {
+                promptInput("Enter name of file to write to:", input, promptLine, 1);
+                char text[1024];
+                promptInput("Enter text:", text, promptLine, 1);
+                int status = fileWrite(input, text);
+                if(status == SUCCESS)
+                    prompt = "Text written successfully.";
+                else
+                    prompt = "Text could not be written.";
+            }
+            else if(sel == WRITEINTRO) {
+                promptInput("Enter name of file to write my intro to:", input, promptLine, 1);
+                int status = fileWrite(input, myIntro);
+                if(status == SUCCESS)
+                    prompt = "Intro written successfully.";
+                else
+                    prompt = "Intro could not be written.";
+            }
+            else if(sel == READ) {
+                promptInput("Enter name of file to read from:", input, promptLine, 1);
+                char text[1024]= { 0 };
+                int status = fileRead(input, text, 1024);
+                if(status == ERROR)
+                    prompt = "File could not be read.";
+                else {
+                    clear();
+                    mvprintw(0, 0, "%s", text);
+                    refresh();
+                    getch();
+                    clear();
+                }
+            }
+            else if(sel == CLOSE) {
+                promptInput("Enter name of file to close:", input, promptLine, 1);
+                int status = fileClose(input);
+                if(status == SUCCESS)
+                    prompt = "File closed successfully.";
+                else
+                    prompt = "File could not be closed.";
+            }
+            else if(sel == DELETE) {
+                promptInput("Enter name of file to delete:", input, promptLine, 1);
+                int status = fileDelete(input);
+                if(status == SUCCESS)
+                    prompt = "File deleted successfully.";
+                else
+                    prompt = "File could not be deleted.";
+            }
+            else if(sel == EXIT) {
+                break;
+            }
         }
-        drawFiles(files, fileCount, fileIndex, 1, 1);
+        clear();
+        drawOpenFiles(1, openFileCol);
+        drawPrompt(prompt, promptLine, 1);
+        drawOptions("MENU", options, nOptions, sel, 1, 1);
         refresh();
         
     }
 
     endwin();
-
-    for(int i = 0; i < fileCount; i ++)
-        free(files[i]);
-    free(files);
 
     return 0;
 }

@@ -1,10 +1,33 @@
+#ifndef DEAN_LIBFS_H
+#define DEAN_LIBFS_H
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_FILENAME 128
+#define SUCCESS 0
+#define ERROR 1
+
+
+typedef struct FSOpenFile {
+    struct FSOpenFile * leftChild;
+    char name[MAX_FILENAME];
+    struct FSOpenFile * rightChild;
+} FSOpenFile;
+
 // Create a new file
-void fileCreate(char *path);
+int fileCreate(char * name);
 // Open an existing file
-void fileOpen(char *path);
-// Read data from a file
-void fileRead();
+int fileOpen(char * name);
+// Read text from a file
+int fileRead(char * name, char * buffer, int max);
+// Write text to a file
+int fileWrite(char * name, char * text);
 // Close an open file
-void fileClose();
+int fileClose(char * name);
 // Delete a file
-void fileDelete();
+int fileDelete(char * name);
+int sprintOpenFiles(char * buffer, int buffsize);
+
+#endif
